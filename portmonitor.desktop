@@ -2,8 +2,8 @@
 Version=1.0
 Type=Application
 Terminal=false
-Exec=feedindicator
-Icon=feedindicator
+Exec=upnproutermonitor
+Icon=upnproutermonitor
 Name=Feedindicator
 Comment=RSS feed updates in the indicator area
 Categories=Internet;Network;

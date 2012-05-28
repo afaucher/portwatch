@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-#		feedindicator
+#		upnproutermonitor
 #       Copyright (C) 2010-2011 Dave Gardner <eunbolt@gmail.com> & Michael Judge <email@clickopen.co.uk>
 #
 #		This program is free software: you can redistribute it and/or modify
@@ -50,11 +50,11 @@ from types import BooleanType, StringType, IntType, FloatType
 feedparser._HTMLSanitizer.acceptable_elements = []
 
 # common name used for file paths, gconf and indicator identifier
-app_identifier = 'feedindicator'
+app_identifier = 'upnproutermonitor'
 
 # indicator icon names
-app_indicator_icon = 'indicator-feedindicator'
-app_indicator_icon_attention = 'indicator-feedindicator-attention'
+app_indicator_icon = 'indicator-upnproutermonitor'
+app_indicator_icon_attention = 'indicator-upnproutermonitor-attention'
 
 # XDG config
 xdg_config_dir = glib.get_user_config_dir()
@@ -68,8 +68,8 @@ app_cache_file = os.path.join(app_cache_dir, 'feeds.dat')
 
 # /usr/share/
 app_share_dir = '/usr/share/'+app_identifier+'/'
-app_icon = os.path.join(app_share_dir, 'feedindicator-icon.png')
-app_logo = os.path.join(app_share_dir, 'feedindicator-logo.png')
+app_icon = os.path.join(app_share_dir, 'upnproutermonitor-icon.png')
+app_logo = os.path.join(app_share_dir, 'upnproutermonitor-logo.png')
 
 # autostart file
 app_autostart_folder = os.path.join(xdg_config_dir, 'autostart')
@@ -80,7 +80,7 @@ app_name = 'Feedindicator'
 app_version = '1.03'
 app_comments = 'RSS feed updates in the indicator area'
 app_copyright = 'Copyright (C) 2010-2011 Dave Gardner & Michael Judge'
-app_website = 'http://code.google.com/p/feedindicator/'
+app_website = 'http://code.google.com/p/upnproutermonitor/'
 app_license = (('This program is free software: you can redistribute it and/or modify\n'+
 'it under the terms of the GNU General Public License as published by\n'+
 'the Free Software Foundation, either version 3 of the License, or\n'+
