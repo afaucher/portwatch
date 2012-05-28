@@ -1,0 +1,530 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+#
+#		portwatch
+#       Copyright (C) 2010-2011 Dave Gardner <eunbolt@gmail.com> & Michael Judge <email@clickopen.co.uk>
+#
+#		This program is free software: you can redistribute it and/or modify
+#		it under the terms of the GNU General Public License as published by
+#		the Free Software Foundation, either version 3 of the License, or
+#		(at your option) any later version.
+#
+#		This program is distributed in the hope that it will be useful,
+#		but WITHOUT ANY WARRANTY; without even the implied warranty of
+#		MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#		GNU General Public License for more details.
+#
+#		You should have received a copy of the GNU General Public License
+#		along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
+# [SNIPPET_NAME: Parse an RSS feed]
+# [SNIPPET_CATEGORIES: feedparser]
+# [SNIPPET_DESCRIPTION: Parse and iterate over the items in an RSS feed]
+# [SNIPPET_AUTHOR: Tim Voet <tim.voet@gmail.com>]
+# [SNIPPET_DOCS: http://www.feedparser.org/docs/introduction.html]
+# [SNIPPET_LICENSE: GPL]
+
+# need python-feedparser and app-indicator(should come with ubuntu 10.04 and above)
+
+import pygtk
+pygtk.require('2.0')
+import glib
+import gtk
+import appindicator
+import feedparser
+import gc
+import hashlib
+import os
+import pynotify
+import string
+import sys
+import urllib
+import webbrowser
+import gconf
+import time
+
+import re
+import tempfile
+import shlex, subprocess
+
+from time import sleep
+from gconf import VALUE_BOOL, VALUE_INT, VALUE_STRING, VALUE_FLOAT
+from types import BooleanType, StringType, IntType, FloatType
+
+# clear out the html element list so all are removed
+feedparser._HTMLSanitizer.acceptable_elements = []
+
+# common name used for file paths, gconf and indicator identifier
+app_identifier = 'portwatch'
+
+# indicator icon names
+app_indicator_icon = 'indicator-portwatch'
+app_indicator_icon_attention = 'indicator-portwatch-attention'
+
+# XDG config
+xdg_config_dir = glib.get_user_config_dir()
+app_config_dir = os.path.join(xdg_config_dir, app_identifier)
+app_config_file = os.path.join(app_config_dir, 'portwatch.cfg')
+
+# XDG cache
+xdg_cache_dir = glib.get_user_cache_dir()
+app_cache_dir = os.path.join(xdg_cache_dir, app_identifier)
+app_cache_file = os.path.join(app_cache_dir, 'portwatch.dat')
+
+# /usr/share/
+app_share_dir = '/usr/share/'+app_identifier+'/'
+app_icon = os.path.join(app_share_dir, 'portwatch-icon.png')
+app_logo = os.path.join(app_share_dir, 'portwatch-logo.png')
+
+# autostart file
+app_autostart_folder = os.path.join(xdg_config_dir, 'autostart')
+app_autostart_file = os.path.join(app_autostart_folder, app_identifier+'.desktop')
+
+# general app info mostly used in about dialog
+app_name = 'portwatch'
+app_version = '1.00'
+app_comments = 'Dynamic port mapping updates in the indicator area'
+app_copyright = 'Copyright (C) 2012 Alexander Faucher'
+app_website = 'http://code.google.com/p/portwatch/'
+app_license = (('This program is free software: you can redistribute it and/or modify\n'+
+'it under the terms of the GNU General Public License as published by\n'+
+'the Free Software Foundation, either version 3 of the License, or\n'+
+'(at your option) any later version.\n'+
+'\n'+
+'This program is distributed in the hope that it will be useful,\n'+
+'but WITHOUT ANY WARRANTY; without even the implied warranty of\n'+
+'MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the\n'+
+'GNU General Public License for more details.\n'+
+'\n'+
+'You should have received a copy of the GNU General Public License\n'+
+'along with this program.  If not, see <http://www.gnu.org/licenses/>.'))
+app_authors = ['Alexander Faucher <alexanderfaucher@gmail.com>']
+app_documenters = ['Alexander Faucher <alexanderfaucher@gmail.com>']
+
+# default autostart status
+autostart = False
+
+# default feed refresh time (minutes*seconds)
+refreshtime = 30
+
+# default stop the timer from running?
+stoptimer = False
+
+# default put feed items in submenus
+usesubmenus = False
+
+# default show notification popups
+shownotifications = True
+
+
+class Exit:
+
+	def __init__(self, widget):
+		sys.exit()
+
+
+class GConf:
+
+	def __init__ (self, appname, allowed={}):
+		self._domain = '/apps/%s/' % appname
+		self._allowed = allowed
+		self._gconf_client = gconf.client_get_default ()
+
+	def __getitem__ (self, attr):
+		return self.get_value (attr)
+
+	def __setitem__ (self, key, val):
+		allowed = self._allowed
+		if allowed.has_key(key):
+			if not key in allowed[key]:
+				good = ', '.join (allowed[key])
+				return False
+		self.set_value (key, val)
+
+	def _get_type (self, key):
+		KeyType = type (key)
+		if KeyType == BooleanType:
+			return 'bool'
+		elif KeyType == StringType:
+			return 'string'
+		elif KeyType == IntType:
+			return 'int'
+		elif KeyType == FloatType:
+			return 'float'
+		else:
+			return None
+
+    # Public functions
+
+	def set_allowed (self, allowed):
+		self._allowed = allowed
+
+	def set_domain (self, domain):
+		self._domain = domain
+
+	def get_domain (self):
+		return self._domain
+
+	def get_gconf_client (self):
+		return self._gconf_client
+
+	def get_value (self, key):
+		"""returns the value of key 'key' """
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		value = self._gconf_client.get(self._domain + key)
+		if value is not None:
+			ValueType = value.type
+			if ValueType == VALUE_BOOL:
+				return value.get_bool()
+			elif ValueType == VALUE_INT:
+				return value.get_int()
+			elif ValueType == VALUE_STRING:
+				return value.get_string()
+			elif ValueType == VALUE_FLOAT:
+				return value.get_float()
+			else:
+				return None
+		else:
+			return None
+
+	def set_value (self, key, value):
+		"""sets the value of key 'key' to 'value' """
+		value_type = self._get_type(value)
+		if value_type is not None:
+			if '/' in key:
+				raise 'GConfError', 'key must not contain /'
+			func = getattr (self._gconf_client, 'set_' + value_type)
+			apply(func, (self._domain + key, value))
+
+	def get_string (self, key):
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		return self._gconf_client.get_string(self._domain + key)
+
+	def set_string (self, key, value):
+		if type (value) != StringType:
+			raise 'GConfError', 'value must be a string'
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		self._gconf_client.set_string(self._domain + key, value)
+
+	def get_bool (self, key):
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		return self._gconf_client.get_bool(self._domain + key)
+
+	def set_bool (self, key, value):
+		if type (value) != IntType and (key != 0 or key != 1):
+			raise 'GConfError', 'value must be a boolean'
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		self._gconf_client.set_bool(self._domain + key, value)
+
+	def get_int (self, key):
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		return self._gconf_client.get_int(self._domain + key)
+
+	def set_int (self, key, value):
+		if type (value) != IntType:
+			raise 'GConfError', 'value must be an int'
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		self._gconf_client.set_int(self._domain + key, value)
+
+	def get_float (self, key):
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		return self._gconf_client.get_float(self._domain + key)
+
+	def set_float (self, key, value):
+		if type (value) != FloatType:
+			raise 'GConfError', 'value must be a float'
+		if '/' in key:
+			raise 'GConfError', 'key must not contain /'
+		self._gconf_client.set_float(self._domain + key, value)
+
+
+class AboutDialog:
+
+	def __init__(self, widget):
+
+		about = gtk.AboutDialog()
+		about.set_logo(gtk.gdk.pixbuf_new_from_file(app_logo))
+		about.set_name(app_name)
+		about.set_program_name(app_name)
+		about.set_version(app_version)
+		about.set_comments(app_comments)
+		about.set_copyright(app_copyright)
+		about.set_license(app_license)
+		about.set_website(app_website)
+		about.set_website_label(app_website)
+		about.set_authors(app_authors)
+		about.set_documenters(app_documenters)
+		about.run()
+		about.destroy()
+
+class AppIndicator:
+
+	def __init__(self):
+
+		global refreshtime
+		global stoptimer
+		global autostart
+		global shownotifications
+		global usesubmenus
+
+		if gconf['refreshtime'] is not None:
+			refreshtime = gconf['refreshtime'];
+		else:
+			gconf['refreshtime'] = refreshtime;
+
+		if gconf['stoptimer'] is not None:
+			stoptimer = gconf['stoptimer'];
+		else:
+			gconf['stoptimer'] = stoptimer;
+
+		if gconf['shownotifications'] is not None:
+			shownotifications = gconf['shownotifications'];
+		else:
+			gconf['shownotifications'] = shownotifications;
+
+		if gconf['usesubmenus'] is not None:
+			usesubmenus = gconf['usesubmenus'];
+		else:
+			gconf['usesubmenus'] = usesubmenus;
+
+		if os.path.exists(app_autostart_file):
+			autostart = True
+
+		if os.path.isdir(app_config_dir) == False:
+			os.mkdir(app_config_dir,0700)
+
+		if os.path.isdir(app_cache_dir) == False:
+			os.mkdir(app_cache_dir,0700)
+
+		if os.path.isfile(app_config_file) == False:
+			ff = open(app_config_file, 'w')
+			ff.close()
+
+		if os.path.isfile(app_cache_file) == False:
+			ff = open(app_cache_file, 'w')
+			ff.close()
+
+		self.ind = appindicator.Indicator(app_name, app_identifier, appindicator.CATEGORY_APPLICATION_STATUS)
+		self.ind.set_status(appindicator.STATUS_ACTIVE) #STATUS_PASSIVE = hidden, STATUS_ACTIVE = visible, STATUS_ATTENTION = want the users attention
+		self.ind.set_attention_icon(app_indicator_icon_attention)
+		self.ind.set_icon(app_indicator_icon)
+
+		self.menu = gtk.Menu()
+
+		self.found_mappings = []
+		self.updates_start(None, True)
+
+	def send_notification(self, title, message, image):
+		"""send feed updates to notify-osd"""
+		pynotify.init(title)
+		if image == None:
+			image = 'file://' + app_icon
+		n = pynotify.Notification(title, message, image)
+		n.set_hint_string('x-canonical-append','')
+		n.show()
+
+	def set_status(self,status):
+		"""turns the appindicator to attention and back to normal"""
+		if status == 'true':
+			self.ind.set_status(appindicator.STATUS_ATTENTION)
+		else:
+			self.ind.set_status(appindicator.STATUS_ACTIVE)
+
+	def menuitem_allread(self, data):
+		"""adds all items to read and notify caches"""
+		del self.cacheread[:]
+		del self.cachenotified[:]
+		for feednum,feedinfo in enumerate(self.feeds):
+			for val in feedinfo['postdata']:
+				mdhash = hashlib.md5(str(val['title']) + str(val['link'])).hexdigest()
+				self.cacheread.append(mdhash)
+				self.cachenotified.append(mdhash)
+				feedinfo['readcount'] += 1
+			self.feeds[feednum] = feedinfo
+		self.render_menu(self)
+
+	def menuitem_allunread(self, data):
+		"""empties read and notify caches"""
+		del self.cacheread[:]
+		del self.cachenotified[:]
+		self.render_menu(self)
+
+	def menuitem_response_website(self, data, url):
+		"""open the feed's website url"""
+		webbrowser.open(url)
+
+	def menuitem_response(self, data, title, url):
+		"""open the website page url"""
+		webbrowser.open(url)
+		mdhash = hashlib.md5(str(title) + str(url)).hexdigest()
+		self.cacheread.append(mdhash);
+		self.render_menu(self)
+
+	def create_menu_header(self, title, url):
+		"""create the menu heading for each feed"""
+		menu_row = gtk.MenuItem(title)
+		if url != '':
+			menu_row.connect('activate', self.menuitem_response_website, url)
+		return menu_row
+
+	def create_menu_item(self, title, url):
+		"""create the menu entries for each feed"""
+		mdhash = hashlib.md5(str(title) + str(url)).hexdigest()
+		if mdhash not in self.cacheread:
+			if usesubmenus == True:
+				menu_row = gtk.MenuItem(title)
+			else:
+				menu_row = gtk.MenuItem("        " + title)
+			menu_row.connect('activate', self.menuitem_response, title, url)
+			return menu_row
+
+
+	def write_unique_key(self,mapping):
+		return mapping['protocol'] + ':' + mapping['external_port'] + ':' + mapping['ip'] + ':' + mapping['internal_port']
+
+	def get_upnp_data(self,data):
+		global stoptimer
+		if stoptimer == True and timeroverride == False:
+			return False
+		print 'Running discovery'
+		listing = subprocess.Popen(['upnpc','-l'], stdout=subprocess.PIPE)
+		output_lines = listing.stdout.readlines()
+		# List set for mappings we just found
+		discovered_mappings = []
+		# Key set for mappings we just found
+		discovered_keys = {}
+		# Key set for mappings we already had
+		existing_keys = {}
+
+		for l in output_lines:
+			parsed_line = re.search(" ([0-9+])[ ]+(UDP|TCP)[ ]+([0-9]+)->([0-9]+.[0-9]+.[0-9]+.[0-9]+):([0-9]+)[ ]+'([^']*)'[ ]+'([^']*)'[ ]+([0-9]+)" ,l)
+			if parsed_line == None:
+				continue
+			protocol = parsed_line.group(2)
+			external_port = parsed_line.group(3)
+			ip = parsed_line.group(4)
+			internal_port = parsed_line.group(5)
+			application = parsed_line.group(6)
+			mapping = {
+				'protocol' : protocol,
+				'external_port' : external_port,
+				'ip' : ip,
+				'internal_port' : internal_port,
+				'application' : application,
+				}
+			key = self.write_unique_key(mapping)
+			print 'Discovered: ' + key
+			discovered_mappings.append(mapping)
+			discovered_keys[key] = True
+
+		# Descriptions for mappings no longer present
+		removed_mappings = []
+		# Descriptions for mappings that were added
+		added_mappings = []
+
+		# Determine which mappings were added or removed
+		for mapping in self.found_mappings:
+			key = self.write_unique_key(mapping)
+			message = self.write_mapping_message(mapping)
+			existing_keys[key] = True
+			if key not in discovered_keys:
+				removed_mappings.append(message)
+		for mapping in discovered_mappings:
+			key = self.write_unique_key(mapping)
+			message = self.write_mapping_message(mapping)
+			if key not in existing_keys:
+				added_mappings.append(message)
+		# Write notification bubble
+		if len(removed_mappings) > 0 or len(added_mappings) > 0:
+			notification = ''
+			if len(removed_mappings) > 0:
+				notification += "These mappings were removed\n"
+				for r in removed_mappings:
+					notification += r + "\n"
+			if len(added_mappings) > 0:
+				notification += "These mappings were added\n"
+				for r in added_mappings:
+					notification += r + "\n"
+			notification = notification.strip()
+			print notification
+			self.send_notification('IGD Mappings Changed',notification, None)
+		self.found_mappings = discovered_mappings
+		self.render_menu(data)
+
+	def write_mapping_message(self,mapping):
+		destination = mapping['ip'] + '' if (mapping['external_port'] == mapping['internal_port']) else ':' + mapping['internal_port']
+		application = '' if mapping['application'] == '' else "'" + mapping['application']  + "' \n\t"
+		return application + mapping['protocol'] + ': ' + mapping['external_port'] + ' > ' + destination
+
+	def render_menu(self,data):
+		"""populate the menu"""
+		global stoptimer
+		unreadcount = 0
+		for child in self.menu.get_children():
+			child.destroy()
+		if len(self.found_mappings) > 0:
+			menu_mappings = gtk.MenuItem('Mappings Found:')
+			self.menu.append(menu_mappings)
+			for mapping in self.found_mappings:
+				message = self.write_mapping_message(mapping)
+				menu_read = gtk.MenuItem('  ' + message)
+				self.menu.append(menu_read)
+		else:
+			menu_notice = gtk.MenuItem('No mappings/igd(s) found')
+			self.menu.append(menu_notice)
+			menu_notice.set_sensitive(False)
+		menu_spacer = gtk.SeparatorMenuItem()
+		self.menu.append(menu_spacer)
+		menu_update = gtk.MenuItem('Refresh')
+		menu_update.connect('activate', self.updates_start)
+		self.menu.append(menu_update)
+		menu_quit = gtk.MenuItem('Quit')
+		self.menu.append(menu_quit)
+		menu_quit.connect('activate', Exit)
+		self.menu.show_all()
+		self.ind.set_menu(self.menu)
+		self.set_status('true')
+
+	def updates_toggle(self, data):
+		"""toggle updating"""
+		global stoptimer
+		if stoptimer == True:
+			stoptimer = False
+			gconf['stoptimer'] = False
+			self.send_notification(app_name + ' - Started','Feeds will update every ' + str(refreshtime/60) + ' minutes', None)
+			self.updates_start(self)
+		else:
+			stoptimer = True
+			gconf['stoptimer'] = True
+			self.send_notification(app_name + ' - Stopped','Feeds will not update automatically', None)
+
+	def updates_start(self,data=None,timeroverride=False):
+		"""start updating"""
+		glib.timeout_add_seconds(refreshtime, self.get_upnp_data, None)
+		self.get_upnp_data(None)
+
+
+def main():
+	gtk.main()
+	return 0
+
+if __name__ == "__main__":
+	'''delay to make sure config files are accessible on autostart'''
+	cmdline = sys.argv
+	if len(cmdline) > 1:
+		if cmdline[1] == '--autostarted':
+			time.sleep(5)
+	if gc.isenabled() == False:
+		gc.enable()
+	gconf = GConf(app_identifier)
+	indicator = AppIndicator()
+	main()
+

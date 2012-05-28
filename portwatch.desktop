@@ -1,0 +1,10 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Terminal=false
+Exec=portwatch
+Icon=portwatch
+Name=PortWatch
+Comment=Port mapping updates in the indicator area
+Categories=Internet;Network;
+
