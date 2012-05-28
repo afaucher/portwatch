@@ -1,6 +1,6 @@
 #!/bin/sh
 
-sudo apt-get install python-feedparser
+sudo apt-get install miniupnpc
 sudo xdg-icon-resource install --theme ubuntu-mono-dark --novendor --size 22 dark/indicator-portwatch.png indicator-portwatch
 sudo xdg-icon-resource install --theme ubuntu-mono-dark --novendor --size 22 dark/indicator-portwatch-attention.png indicator-portwatch-attention
 sudo xdg-icon-resource install --theme ubuntu-mono-light --novendor --size 22 light/indicator-portwatch.png indicator-portwatch
@@ -23,6 +23,6 @@ sudo cp portwatch-logo.png /usr/share/portwatch/portwatch-logo.png
 sudo cp portwatch /usr/bin/portwatch
 sudo chmod +x /usr/bin/portwatch
 
-MESSAGE="Feedindicator install completed..."
+MESSAGE="PortWatch install completed..."
 echo $MESSAGE
 

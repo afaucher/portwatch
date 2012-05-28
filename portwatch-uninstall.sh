@@ -39,6 +39,6 @@ then
 rm -r "$cachedir"
 fi
 
-MESSAGE="Feedindicator uninstall completed..."
+MESSAGE="PortWatch uninstall completed..."
 echo $MESSAGE
 
