@@ -486,6 +486,15 @@ class AppIndicator:
 		menu_update = gtk.MenuItem('Refresh')
 		menu_update.connect('activate', self.updates_start)
 		self.menu.append(menu_update)
+
+		menu_updatecheck = gtk.CheckMenuItem('Monitor IGD(s)')
+		if stoptimer == True:
+			menu_updatecheck.set_active(False)
+		else:
+			menu_updatecheck.set_active(True)
+		menu_updatecheck.connect('toggled', self.updates_toggle)
+		self.menu.append(menu_updatecheck)
+
 		menu_quit = gtk.MenuItem('Quit')
 		self.menu.append(menu_quit)
 		menu_quit.connect('activate', Exit)
@@ -499,12 +508,12 @@ class AppIndicator:
 		if stoptimer == True:
 			stoptimer = False
 			gconf['stoptimer'] = False
-			self.send_notification(app_name + ' - Started','Feeds will update every ' + str(refreshtime/60) + ' minutes', None)
+			self.send_notification(app_name + ' - Started','Mappings will be checked every ' + str(refreshtime/60) + ' minutes', None)
 			self.updates_start(self)
 		else:
 			stoptimer = True
 			gconf['stoptimer'] = True
-			self.send_notification(app_name + ' - Stopped','Feeds will not update automatically', None)
+			self.send_notification(app_name + ' - Stopped','Mappings will not be checked automatically', None)
 
 	def updates_start(self,data=None,timeroverride=False):
 		"""start updating"""

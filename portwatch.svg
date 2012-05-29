@@ -14,9 +14,9 @@
    viewBox="0 0 256 256"
    inkscape:version="0.48.3.1 r9886"
    sodipodi:docname="portwatch.svg"
-   inkscape:export-filename="/home/afaucher/dev/portwatch/portwatch-icon.png"
-   inkscape:export-xdpi="22.5"
-   inkscape:export-ydpi="22.5">
+   inkscape:export-filename="/home/afaucher/dev/portwatch/portwatch-indicator.png"
+   inkscape:export-xdpi="15.47"
+   inkscape:export-ydpi="15.47">
   <metadata
      id="metadata34">
     <rdf:RDF>
@@ -25,6 +25,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -37,15 +38,15 @@
      guidetolerance="10"
      inkscape:pageopacity="0"
      inkscape:pageshadow="2"
-     inkscape:window-width="1244"
-     inkscape:window-height="956"
+     inkscape:window-width="1508"
+     inkscape:window-height="1020"
      id="namedview32"
      showgrid="true"
-     inkscape:zoom="2.6074563"
-     inkscape:cx="-41.590742"
-     inkscape:cy="35.181904"
-     inkscape:window-x="2270"
-     inkscape:window-y="79"
+     inkscape:zoom="5.2149126"
+     inkscape:cx="61.161387"
+     inkscape:cy="58.735002"
+     inkscape:window-x="425"
+     inkscape:window-y="37"
      inkscape:window-maximized="0"
      inkscape:current-layer="RSSicon">
     <inkscape:grid
