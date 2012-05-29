@@ -338,55 +338,6 @@ class AppIndicator:
 		else:
 			self.ind.set_status(appindicator.STATUS_ACTIVE)
 
-	def menuitem_allread(self, data):
-		"""adds all items to read and notify caches"""
-		del self.cacheread[:]
-		del self.cachenotified[:]
-		for feednum,feedinfo in enumerate(self.feeds):
-			for val in feedinfo['postdata']:
-				mdhash = hashlib.md5(str(val['title']) + str(val['link'])).hexdigest()
-				self.cacheread.append(mdhash)
-				self.cachenotified.append(mdhash)
-				feedinfo['readcount'] += 1
-			self.feeds[feednum] = feedinfo
-		self.render_menu(self)
-
-	def menuitem_allunread(self, data):
-		"""empties read and notify caches"""
-		del self.cacheread[:]
-		del self.cachenotified[:]
-		self.render_menu(self)
-
-	def menuitem_response_website(self, data, url):
-		"""open the feed's website url"""
-		webbrowser.open(url)
-
-	def menuitem_response(self, data, title, url):
-		"""open the website page url"""
-		webbrowser.open(url)
-		mdhash = hashlib.md5(str(title) + str(url)).hexdigest()
-		self.cacheread.append(mdhash);
-		self.render_menu(self)
-
-	def create_menu_header(self, title, url):
-		"""create the menu heading for each feed"""
-		menu_row = gtk.MenuItem(title)
-		if url != '':
-			menu_row.connect('activate', self.menuitem_response_website, url)
-		return menu_row
-
-	def create_menu_item(self, title, url):
-		"""create the menu entries for each feed"""
-		mdhash = hashlib.md5(str(title) + str(url)).hexdigest()
-		if mdhash not in self.cacheread:
-			if usesubmenus == True:
-				menu_row = gtk.MenuItem(title)
-			else:
-				menu_row = gtk.MenuItem("        " + title)
-			menu_row.connect('activate', self.menuitem_response, title, url)
-			return menu_row
-
-
 	def write_unique_key(self,mapping):
 		return mapping['protocol'] + ':' + mapping['external_port'] + ':' + mapping['ip'] + ':' + mapping['internal_port']
 

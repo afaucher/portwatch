@@ -1,0 +1,6 @@
+An applet to monitor UPNP IGD(s) and report on the current mapped ports.
+
+Largely based on feedindicator by:
+Dave Gardner <eunbolt@gmail.com> & Michael Judge <email@clickopen.co.uk>
+For more see:
+https://code.google.com/p/feedindicator/
